@@ -1,0 +1,9 @@
+config BR2_PACKAGE_THERMAL_SCOPE
+    bool "thermal-scope"
+    depends on BR2_INSTALL_LIBSTDCPP
+    depends on BR2_PACKAGE_OPENCV3_LIB_VIDEOIO
+    depends on BR2_PACKAGE_OPENCV3_LIB_IMGPROC
+    depends on BR2_PACKAGE_JSONCPP
+    help
+      My Package is a sample package for demonstration purposes.
+      https://example.com/my_package
