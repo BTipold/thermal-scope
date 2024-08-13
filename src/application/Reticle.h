@@ -32,14 +32,37 @@ enum class ReticleType : uint8_t {
     kCount
 };
 
+inline constexpr const char * ReticleTypeToStr(ReticleType color) {
+    switch (color) {
+        case ReticleType::kDefault:
+            return "Red";
+        case ReticleType::kCross:
+            return "Cross";
+        case ReticleType::kChevron:
+            return "Chevron";
+        case ReticleType::kSmall:
+            return "Small";
+        case ReticleType::kDot:
+            return "Dot";
+        case ReticleType::kEotech:
+            return "EOTech";
+        case ReticleType::kCount:
+        default:
+            return "ERROR";
+    }
+}
+
 class Reticle {
 public:
+    Reticle();
     Reticle(const std::string& path);
     ~Reticle();
 
-    // Method to overlay the reticle on a given frame
-    void Overlay(cv::Mat& frame) const;
-    void SetOffset(size_t x, size_t y);
+    cv::Mat& GetOverlay();
+    void SetImagePath(const std::string& path);
+    void SetOffset(int32_t x, int32_t y);
+    void SetX(int32_t x);
+    void SetY(int32_t y);
 
 private:
     const size_t kWidth = 240u;
@@ -48,8 +71,8 @@ private:
     ReticleType mType;
     cv::Mat mSource;
     cv::Mat mReticle;
-    size_t mXOffset;
-    size_t mYOffset;
+    int32_t mXOffset;
+    int32_t mYOffset;
 };
 
 } // thermal

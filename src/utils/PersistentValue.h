@@ -28,6 +28,7 @@
 
 #include "Logger.h"
 #include "Utils.h"
+#include "DelayedWriter.h"
 
 namespace thermal {
 namespace persistent {
@@ -49,7 +50,10 @@ public:
      * 
      * @param key The key used for persistence (i.e., the filename).
      */
-    BaseSaveable(std::string key) : mKey(key) {
+    BaseSaveable(std::string key) 
+        : mKey(key)
+        , mDelayedWriter(std::chrono::seconds(3), kPersistentPath + mKey) {
+        utils::EnsureDirectoryExists(kPersistentPath);
         return;
     }
 
@@ -91,21 +95,19 @@ public:
      * @return false If there was an error saving the value.
      */
     bool Save() {
+
         // Ensure directory exists
         std::string path = kPersistentPath + mKey;
-        utils::EnsureDirectoryExists(path);
 
         // write to file
-        std::ofstream f(path, std::ios::trunc);
-        if (f.is_open()) {
-            Json::Value json = Serialize();
-            f << json;
-            f.close();
-            DLOG_DEBUG("saving %s", path.c_str());
+        DLOG_DEBUG("saving %s", path.c_str());
+        Json::Value json = Serialize();
+
+        if  (!json.empty()) {
+            mDelayedWriter.Clear();
+            mDelayedWriter << json;
             return true;
-            
         } else {
-            DLOG_ERROR("error opening %s", path.c_str());
             return false;
         }
     }
@@ -144,6 +146,8 @@ public:
 
 protected:
     std::string mKey; ///< The key used for persistence.
+    utils::DelayedWriter mDelayedWriter; ///< Due to NANDflash concerns, we use a delayed
+                                         ///  writer to ease the number of reads or writes. 
 };
 
 /**

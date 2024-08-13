@@ -77,28 +77,38 @@ public:
      */
     void SetOnClickCallback(ClickCallback callback);
 
+    /**
+     * @brief Clear the callback function for rotate events.
+     */
+    void ClearOnRotateCallback();
+
+    /**
+     * @brief Clear the callback function for click events.
+     */
+    void ClearOnClickCallback();
+
 private:
     RotateCallback mRotateCallback; ///< Callback function for rotation events.
     ClickCallback mClickCallback;   ///< Callback function for click events.
     gpio::Watcher mGpioA;           ///< GPIO watcher for the A pin.
     gpio::Watcher mGpioB;           ///< GPIO watcher for the B pin.
     gpio::Watcher mGpioBtn;         ///< GPIO watcher for the button pin.
-    bool mPrevA;                    ///< Previous state of the A pin.
-    bool mPrevB;                    ///< Previous state of the B pin.
+    uint8_t mSeqA = 0;              ///< Holds the last 4 states in a bitfield
+    uint8_t mSeqB = 0;              ///< Holds the last 4 states in a bitfield
 
     /**
      * @brief Internal method to handle rotation events.
-     * @param gpio GPIO pin number.
-     * @param level The level of the GPIO pin (true for high, false for low).
+     * @param gpio unused.
+     * @param level unused.
      */
-    void OnRotateEvent(int32_t gpio, bool level);
+    void OnRotateEvent(int32_t, bool);
     
     /**
      * @brief Internal method to handle click events.
-     * @param gpio GPIO pin number.
+     * @param gpio unused.
      * @param level The level of the GPIO pin (true for high, false for low).
      */
-    void OnClickEvent(int32_t gpio, bool level);
+    void OnClickEvent(int32_t, bool level);
 };
 
 } // namespace hw

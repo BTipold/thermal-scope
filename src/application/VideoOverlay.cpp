@@ -18,17 +18,38 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <unordered_map>
+
 #include "Reticle.h"
 #include "Logger.h"
 
 namespace thermal {
 
-inline constexpr const char* const kReticlePath = "/etc/thermal-scope/reticles/";
+ const std::unordered_map<ReticleType, std::string> kReticlePaths = {
+    { ReticleType::kDefault, "/etc/thermal-scope/reticles/default.png"},
+    { ReticleType::kCross, "/etc/thermal-scope/reticles/cross.png"},
+    { ReticleType::kChevron, "/etc/thermal-scope/reticles/chevron.png"},
+    { ReticleType::kSmall, "/etc/thermal-scope/reticles/small.png"},
+    { ReticleType::kDot, "/etc/thermal-scope/reticles/dot.png"},
+    { ReticleType::kEotech, "/etc/thermal-scope/reticles/eotech.png"},
+};
+
+constexpr int32_t kThickness = 2;
+constexpr int32_t kFontFace = cv::FONT_HERSHEY_SIMPLEX;
+
 
 VideoOverlay::VideoOverlay() 
-    : mReticleList()
-    , mTopMode()
-    , mSideMode() {
+    : mReticle(kReticlePaths.at(ReticleType::kDefault))
+    , mFinalOverlay()
+    , mTopMsg{{TopMode::kXOffset, ""},
+              {TopMode::kPickColor, ""},
+              {TopMode::kPickReticle, ""}}
+    , mSideMsg{{SideMode::kYOffset, ""},
+               {SideMode::kZoom, ""}}
+    , mTopMode(TopMode::kNone)
+    , mSideMode(SideMode::kNone) {
+
+    Redraw();
     return;
 }
 
@@ -37,6 +58,7 @@ VideoOverlay::~VideoOverlay() {
 }
 
 void VideoOverlay::Overlay(cv::Mat& frame) const {
+
     if (frame.size() != mFinalOverlay.size()) {
         DLOG_ERROR("Frame size does not match reticle size.");
     }
@@ -60,51 +82,99 @@ void VideoOverlay::Overlay(cv::Mat& frame) const {
 }
 
 void VideoOverlay::SetOffset(int32_t x, int32_t y) {
-    auto reticle = mReticleList.at(mReticleType);
-    reticle.SetOffset(x, y);
+    mReticle.SetOffset(x, y);
+    Redraw();
 }
 
 void VideoOverlay::SetX(int32_t x) {
+    DLOG_DEBUG("adjusting x offset %d", x);
+    mReticle.SetX(x);
+    mTopMsg[TopMode::kXOffset] = std::to_string(x);
+    Redraw();
 }
 
 void VideoOverlay::SetY(int32_t y) {
+    DLOG_DEBUG("adjusting y offset %d", y);
+    mReticle.SetY(y);
+    mSideMsg[SideMode::kYOffset] = std::to_string(y);
+    Redraw();
+}
+
+void VideoOverlay::SetZoom(int32_t level) {
+    DLOG_DEBUG("adjusting zoom %d", level);
+    mSideMsg[SideMode::kZoom] = std::to_string(level);
+    Redraw();
+}
+
+void VideoOverlay::SetReticleType(ReticleType reticleType) {
+    if (kReticlePaths.contains(reticleType)) {
+        mReticle.SetImagePath(kReticlePaths.at(reticleType));
+        mTopMsg[TopMode::kPickReticle] = std::string(ReticleTypeToStr(reticleType));
+        Redraw();
+    }
+}
+
+void VideoOverlay::SetColorMode(p2pro::ColorMode pseudocolor) {
+    mTopMsg[TopMode::kPickColor] = p2pro::ColorToString(pseudocolor);
+    Redraw();
+    return;
 }
 
 void VideoOverlay::SetTopMenuMode(TopMode mode) {
     mTopMode = mode;
-
-    switch (mTopMode) {
-    case TopMode::kXOffset: {
-    } break;
-
-    case TopMode::kPickReticle:
-        break;
-  
-    case TopMode::kPickColor:
-        break;
-
-    case TopMode::kNone:
-    default:
-        break;
-    }
+    Redraw();
+    return;
 }
 
 void VideoOverlay::SetSideMenuMode(SideMode mode) {
     mSideMode = mode;
+    Redraw();
+    return;
+}
 
-    switch (mSideMode) {
-    case SideMode::kYOffset: {
+void VideoOverlay::Redraw() {
+    DLOG_DEBUG("recalculating overlay");
+    mReticle.GetOverlay().copyTo(mFinalOverlay);
 
-    } break;
+    if (mTopMode != TopMode::kNone) {
+        static const std::unordered_map<TopMode, std::string> map {
+            {TopMode::kNone, "Exit"}, 
+            {TopMode::kXOffset, "Zero X"},
+            {TopMode::kPickReticle, "Reticle"},
+            {TopMode::kPickColor, "Colour Mode"},
+        };
 
-    case SideMode::kZoom: {
-        
-    } break;
-  
-    case SideMode::kNone:
-    default:
-        break;
+        std::string text = map.at(mTopMode);
+        bool status = DrawTextCentreAligned(mFinalOverlay, text, cv::Point(120, 35), 0.4, kThickness);
+        status &= DrawTextCentreAligned(mFinalOverlay, mTopMsg[mTopMode], cv::Point(120, 55), 0.4, kThickness);
     }
+
+    if (mSideMode != SideMode::kNone) {
+        static const std::unordered_map<SideMode, std::string> map {
+            {SideMode::kNone, "Exit"},
+            {SideMode::kYOffset, "Zero Y"},
+            {SideMode::kZoom, "Zoom"},
+        };
+
+        std::string text = map.at(mSideMode);
+        bool status = DrawTextCentreAligned(mFinalOverlay, text, cv::Point(190, 110), 0.4, kThickness);
+        status &= DrawTextCentreAligned(mFinalOverlay, mSideMsg[mSideMode], cv::Point(190, 130), 0.4, kThickness);
+    }
+}
+
+bool VideoOverlay::DrawTextCentreAligned(cv::Mat& image, const std::string& text, cv::Point centerPos, double size, int32_t thickness) const {
+    cv::Scalar color(15, 15, 15, 255);
+
+    // Get the text size
+    int baseline = 0;
+    cv::Size textSize = cv::getTextSize(text, kFontFace, size, thickness, &baseline);
+
+    // Calculate the position for center alignment
+    cv::Point textOrg(centerPos.x - (textSize.width / 2), centerPos.y + (textSize.height / 2));
+
+    // Put the text in the center
+    cv::putText(image, text, textOrg, kFontFace, size, color, thickness);
+    return true;
 }
 
 

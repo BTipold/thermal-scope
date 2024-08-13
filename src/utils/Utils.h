@@ -43,6 +43,12 @@ static EType RotateEnum(EType e, int32_t max, int32_t skip = 1) {
     if (max == 0) return e;
     int32_t num = static_cast<int32_t>(e);
     num = (num + skip) % max;
+
+    // Adjust for negative result to ensure positive enum index
+    if (num < 0) {
+        num += max;
+    }
+
     return static_cast<EType>(num);
 }
 

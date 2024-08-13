@@ -53,6 +53,7 @@ void Webcam::UnregisterCallback(VideoCallback fptr) {
     if (it != mDataCallbacks.end()) {
         mDataCallbacks.erase(it, mDataCallbacks.end());
     }
+    return;
 }
 
 bool Webcam::Start() {
@@ -122,6 +123,7 @@ void Webcam::ReleaseCamera() {
     } else {
         DLOG_WARN("did not release camera because it was not open.");
     }
+    return;
 }
 
 WebcamState Webcam::GetState() const {
@@ -134,9 +136,10 @@ void Webcam::Runloop() {
         mCameraSource >> imgData;
         
         for (auto callback : mDataCallbacks) {
-            callback(imgData);
+            callback(imgData, mRunFlag);
         }
     }
+    return;
 }
 
 } // p2pro

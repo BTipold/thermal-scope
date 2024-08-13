@@ -19,26 +19,14 @@
 
 #include <stdint.h>
 #include <opencv2/videoio.hpp>
+#include <unordered_map>
 
+#include "CommonDefs.h"
 #include "Encoder.h"
 #include "Reticle.h"
+#include "P2ProManager.h"
 
 namespace thermal {
-
-enum class TopMode : int8_t {
-    kNone = -1,
-    kXOffset = 0,
-    kPickReticle = 1,
-    kPickColor = 2,
-    kCount,
-};
-
-enum class SideMode : int8_t {
-    kNone = -1,
-    kYOffset = 0,
-    kZoom = 1,
-    kCount,
-};
 
 class VideoOverlay {
 public:
@@ -50,19 +38,24 @@ public:
     void SetOffset(int32_t x, int32_t y);
     void SetX(int32_t x);
     void SetY(int32_t y);
+    void SetZoom(int32_t level);
+    void SetReticleType(ReticleType reticleType);
+    void SetColorMode(p2pro::ColorMode pseudocolor);
     void SetTopMenuMode(TopMode mode);
     void SetSideMenuMode(SideMode mode);
 
     void Redraw();
 
 private:
-    std::unordered_map<ReticleType, Reticle> mReticleList;
-    ReticleType mReticleType;
+    Reticle mReticle;
+    cv::Mat mFinalOverlay;
+    std::unordered_map<TopMode, std::string> mTopMsg;
+    std::unordered_map<SideMode, std::string> mSideMsg;
+
     TopMode mTopMode;
     SideMode mSideMode;
 
-    cv::Mat mFinalOverlay;
-    cv::Mat mText;
+    bool DrawTextCentreAligned(cv::Mat& image, const std::string& text, cv::Point centrePos, double size, int32_t thickness) const;
 };
 
 }

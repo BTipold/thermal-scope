@@ -56,6 +56,7 @@ include_directories(${MAIN_SRC_DIR}/application/)
 include_directories(${MAIN_SRC_DIR}/camera-interface/)
 include_directories(${MAIN_SRC_DIR}/hw/)
 include_directories(${MAIN_SRC_DIR}/utils/)
+include_directories(${MAIN_SRC_DIR}/common/)
 
 # sources to compile
 set(SRC_FILES_TO_COMPILE
@@ -67,6 +68,7 @@ set(SRC_FILES_TO_COMPILE
     ${MAIN_SRC_DIR}/camera-interface/UsbControl.cpp
     ${MAIN_SRC_DIR}/camera-interface/P2ProManager.cpp
     ${MAIN_SRC_DIR}/utils/Logger.cpp
+    ${MAIN_SRC_DIR}/utils/DelayedWriter.cpp
     ${MAIN_SRC_DIR}/hw/FrameBuffer.cpp
     ${MAIN_SRC_DIR}/hw/Encoder.cpp
     ${MAIN_SRC_DIR}/hw/GpioWatcher.cpp
@@ -80,4 +82,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME} opencv_core opencv_videoio opencv_im
 install(TARGETS ${CMAKE_PROJECT_NAME} RUNTIME DESTINATION bin)
 install(FILES ${THIRD_PARTY}/liblgpio/lib/liblgpio.so DESTINATION lib)
 install(FILES ${THIRD_PARTY}/liblgpio/lib/liblgpio.so.1 DESTINATION lib)
-install(FILES ${RESOURCES}/reticles/reticle.png DESTINATION /etc/thermal-scope/reticles/)
+install(FILES ${RESOURCES}/reticles/default.png DESTINATION /etc/thermal-scope/reticles/)
+install(FILES ${RESOURCES}/reticles/cross.png DESTINATION /etc/thermal-scope/reticles/)
+install(FILES ${RESOURCES}/reticles/chevron.png DESTINATION /etc/thermal-scope/reticles/)
+install(FILES ${RESOURCES}/reticles/small.png DESTINATION /etc/thermal-scope/reticles/)
+install(FILES ${RESOURCES}/reticles/dot.png DESTINATION /etc/thermal-scope/reticles/)
+install(FILES ${RESOURCES}/reticles/eotech.png DESTINATION /etc/thermal-scope/reticles/)

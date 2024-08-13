@@ -38,12 +38,12 @@ constexpr const int32_t kP2ProDevId = 0;
 constexpr const int32_t kFrameBufferChannels = 4;
 constexpr const int32_t kExpectedFrameSize = kLcd1in28Width * kLcd1in28Height * kFrameBufferChannels;
 
-constexpr const int32_t kSideEncoderGpioA = 5;
-constexpr const int32_t kSideEncoderGpioB = 6;
-constexpr const int32_t kSideEncoderGpioBtn = 7;
-constexpr const int32_t kTopEncoderGpioA = 5;
-constexpr const int32_t kTopEncoderGpioB = 6;
-constexpr const int32_t kTopEncoderGpioBtn = 7;
+constexpr const int32_t kSideEncoderGpioA = 13;
+constexpr const int32_t kSideEncoderGpioB = 19;
+constexpr const int32_t kSideEncoderGpioBtn = 26;
+constexpr const int32_t kTopEncoderGpioA = 20;
+constexpr const int32_t kTopEncoderGpioB = 21;
+constexpr const int32_t kTopEncoderGpioBtn = 16;
 
 inline constexpr const char* const kFrameBuffer0 = "/dev/fb0";
 
@@ -53,8 +53,9 @@ using std::mutex;
 using std::unique_lock;
 using std::make_shared;
 using std::make_unique;
+using hw::Direction;
 
-ThermalScopeApplication::ThermalScopeApplication() 
+ThermalScopeApplication::ThermalScopeApplication(int32_t argc, char* argv[]) 
     : mP2ProManager(nullptr)
     , mFrameBuffer(kFrameBuffer0)
     , mSideEncoder(kSideEncoderGpioA, kSideEncoderGpioB, kSideEncoderGpioBtn)
@@ -63,15 +64,11 @@ ThermalScopeApplication::ThermalScopeApplication()
     , mSideMode(SideMode::kNone)
     , mColorSetting(p2pro::ColorMode::kPseudoRainbow4, "color")
     , mReticleSetting(ReticleType::kDefault, "reticle")
-    , mXOffsetSetting(0, "y")
-    , mYOffsetSetting(0, "x")
-    , mZoomSetting(0, "zoom") {
-	return;
-}
+    , mXOffsetSetting(0, "x")
+    , mYOffsetSetting(0, "y")
+    , mZoomSetting(0, "zoom") {}
 
-ThermalScopeApplication::~ThermalScopeApplication() {
-	return;
-}
+ThermalScopeApplication::~ThermalScopeApplication() {}
 
 void ThermalScopeApplication::Init() {
     shared_ptr<p2pro::Webcam> camera = make_shared<p2pro::Webcam>(
@@ -82,8 +79,8 @@ void ThermalScopeApplication::Init() {
     // Setup the callbacks
     camera->RegisterOnDataCallback(std::bind(&ThermalScopeApplication::OnCameraData, this, _1));
     mSideEncoder.SetOnClickCallback(std::bind(&ThermalScopeApplication::OnClickSide, this, _1));
-    mSideEncoder.SetOnRotateCallback(std::bind(&ThermalScopeApplication::OnRotateTop, this, _1));
-    mTopEncoder.SetOnClickCallback(std::bind(&ThermalScopeApplication::OnClickSide, this, _1));
+    mSideEncoder.SetOnRotateCallback(std::bind(&ThermalScopeApplication::OnRotateSide, this, _1));
+    mTopEncoder.SetOnClickCallback(std::bind(&ThermalScopeApplication::OnClickTop, this, _1));
     mTopEncoder.SetOnRotateCallback(std::bind(&ThermalScopeApplication::OnRotateTop, this, _1));
 
     // Load settings from filesystem
@@ -105,7 +102,8 @@ void ThermalScopeApplication::Init() {
     // }
 
     //DLOG_INFO("color setting is %s", p2pro::ColorToString(mColorSetting.Get()).c_str() );
-    return;
+
+    mP2ProManager->SetPseudoColor(p2pro::ColorMode::kPseudoBlackHot);
 }
 
 void ThermalScopeApplication::Run() {
@@ -125,20 +123,24 @@ void ThermalScopeApplication::Run() {
 	}
 }
 
-bool ThermalScopeApplication::OnCameraData(cv::Mat &frame) {
+bool ThermalScopeApplication::OnCameraData(cv::Mat &frame, bool lastFrame) {
+    if (lastFrame) {
+        
+    }
+
     size_t width = frame.cols;
     size_t height = frame.rows;
-    DLOG_DEBUG("new frame, size %dx%d", width, height);
 
     // Resize the image to the size of the LCD screen 240x240
     cv::Mat resized;
     cv::resize(frame, resized, cv::Size(240, 240));
+    cv::rotate(resized, resized, cv::ROTATE_90_COUNTERCLOCKWISE);
 
     // Convert the resized image to 32 bpp (8 bits each for R, G, B, and transparency)
     cv::Mat formatted;
     cv::cvtColor(resized, formatted, cv::COLOR_BGR2RGBA);
 
-    // Overlay the reticle
+    // Apply the overlay. 
     mOverlay.Overlay(formatted);
 
     // Write frame to /dev/fb0 (this is where the image gets displayed)
@@ -152,21 +154,25 @@ bool ThermalScopeApplication::OnCameraData(cv::Mat &frame) {
     }
 }
 
-void ThermalScopeApplication::OnRotateSide(hw::Direction direction) {
+void ThermalScopeApplication::OnRotateSide(Direction direction) {
     // incrememnt is +1 and decrememnt is -1
-    int8_t adjustment = (direction == hw::Direction::kIncrement) ? +1 : -1;
+    int32_t adjustment = (direction == hw::Direction::kIncrement) ? +1 : -1;
     
     switch (mSideMode) {
     case SideMode::kYOffset: {
         constexpr const int32_t kMin = -50;
         constexpr const int32_t kMax = 50;
         mYOffsetSetting = std::clamp(mYOffsetSetting + adjustment, kMin, kMax);
+        mYOffsetSetting.Save();
+        mOverlay.SetY(mYOffsetSetting);
     } break;
     
     case SideMode::kZoom: {
         constexpr const uint32_t kMin = 0u;
         constexpr const uint32_t kMax = 100u;
         mZoomSetting = std::clamp(mZoomSetting + adjustment, kMin, kMax);
+        mZoomSetting.Save();
+        mOverlay.SetZoom(mZoomSetting);
     } break;
 
     case SideMode::kNone:
@@ -177,22 +183,29 @@ void ThermalScopeApplication::OnRotateSide(hw::Direction direction) {
 
 void ThermalScopeApplication::OnRotateTop(hw::Direction direction) {
     // incrememnt is +1 and decrememnt is -1
-    int8_t adjustment = (direction == hw::Direction::kIncrement) ? +1 : -1;
+    int32_t adjustment = (direction == hw::Direction::kIncrement) ? +1 : -1;
     
     switch (mTopMode) {
     case TopMode::kXOffset: {
         constexpr const int32_t kMin = -50;
         constexpr const int32_t kMax = 50;
-        mYOffsetSetting = std::clamp(mYOffsetSetting + adjustment, kMin, kMax);
+        mXOffsetSetting = std::clamp(mXOffsetSetting + adjustment, kMin, kMax);
+        mXOffsetSetting.Save();
+        mOverlay.SetX(mXOffsetSetting);
     } break;
 
-    case TopMode::kPickReticle:
+    case TopMode::kPickReticle: {
         mReticleSetting = utils::RotateEnum<ReticleType>(mReticleSetting, static_cast<int32_t>(ReticleType::kCount), adjustment);
-        break;
+        mReticleSetting.Save();
+        mOverlay.SetReticleType(mReticleSetting);
+    } break;
   
-    case TopMode::kPickColor:
+    case TopMode::kPickColor: {
         mColorSetting = utils::RotateEnum<p2pro::ColorMode>(mColorSetting, static_cast<int32_t>(p2pro::ColorMode::kCount), adjustment);
-        break;
+        mColorSetting.Save();
+        mOverlay.SetColorMode(mColorSetting);
+        mP2ProManager->SetPseudoColor(mColorSetting);
+    } break;
 
     case TopMode::kNone:
     default:
@@ -201,15 +214,21 @@ void ThermalScopeApplication::OnRotateTop(hw::Direction direction) {
 }
 
 void ThermalScopeApplication::OnClickSide(bool level) {
-    mSideMode = utils::RotateEnum<SideMode>(mSideMode, static_cast<int32_t>(SideMode::kCount));
-    mOverlay.SetSideMenuMode(mSideMode);
-    return;
+    if (level == false) {
+        auto old = mSideMode;
+        mSideMode = utils::RotateEnum<SideMode>(mSideMode, static_cast<int32_t>(SideMode::kCount));
+        DLOG_DEBUG("%s -> %s", SideModeToString(old), SideModeToString(mSideMode));
+        mOverlay.SetSideMenuMode(mSideMode);
+    }
 }
 
 void ThermalScopeApplication::OnClickTop(bool level) {
-    mTopMode = utils::RotateEnum<TopMode>(mTopMode, static_cast<int32_t>(TopMode::kCount));
-    mOverlay.SetTopMenuMode(mTopMode);
-    return;
+    if  (level == false) {
+        auto old = mTopMode;
+        mTopMode = utils::RotateEnum<TopMode>(mTopMode, static_cast<int32_t>(TopMode::kCount));
+        DLOG_DEBUG("%s -> %s", TopModeToString(old), TopModeToString(mTopMode));
+        mOverlay.SetTopMenuMode(mTopMode);
+    }
 }
     
 } // namespace thermal

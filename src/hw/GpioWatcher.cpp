@@ -18,13 +18,15 @@
 
 #include <unordered_map>
 #include <functional>
+#include <thread>
 
 #include "Logger.h"
 
 namespace thermal {
 namespace gpio {
 
-constexpr const int32_t kGpioChip0 = 0; 
+constexpr const int32_t kGpioChip0 = 0;
+constexpr const int32_t kDebounceTime = 500; // microseconds
 
 static std::unordered_map<int32_t, std::vector<gpio::Callback>> sCallbackMap;
 
@@ -39,6 +41,7 @@ void DelegateCallback(int32_t numEvents, lgGpioAlert_p alert, void* userData) {
 
             // handle each callback
             for (auto cb : sCallbackMap.at(gpioInfo.gpio)) {
+                //DLOG_INFO("gpio%d changed to %s", gpioInfo.gpio, gpioInfo.level == 1 ? "HIGH" : "LOW");
                 cb(gpioInfo.gpio, (gpioInfo.level == /* HIGH */ 1));
             }
         }
@@ -46,7 +49,7 @@ void DelegateCallback(int32_t numEvents, lgGpioAlert_p alert, void* userData) {
     return;
 }
 
-Watcher::Watcher(int32_t gpioNumber) 
+Watcher::Watcher(int32_t gpioNumber, int32_t pullup) 
     : mGpioDeviceNumber(gpioNumber) {
 
     // Static handle should be initialized by the first instance.
@@ -64,32 +67,49 @@ Watcher::Watcher(int32_t gpioNumber)
     }
 
     // Set the GPIO pin as an input
-    int32_t status = ::lgGpioClaimInput(sHandle, LG_SET_PULL_UP, gpioNumber);
+    int32_t status = ::lgGpioClaimInput(sHandle, pullup, gpioNumber);
     if (status == 0) {
         DLOG_DEBUG("claimed gpio%d", gpioNumber);
     } else {
-        DLOG_ERROR("Failed to set GPIO %d as input (err %d)", gpioNumber, status);
+        DLOG_ERROR("Failed to set gpio%d as input (err %d)", gpioNumber, status);
         return;
     }
 
-    //status = ::lgGpioSet
+    status = ::lgGpioSetDebounce(sHandle, mGpioDeviceNumber, kDebounceTime);
+    if (status == 0) {
+        DLOG_DEBUG("Successfully set debounce time on gpio%d", gpioNumber);
+    } else {
+        DLOG_ERROR("Failed to set debounce time on gpio%d (err %d)", gpioNumber, status);
+    }
+
+    status = ::lgGpioClaimAlert(sHandle, pullup, LG_BOTH_EDGES, gpioNumber, gpioNumber);
+    if (status == 0) {
+        DLOG_DEBUG("Successfully claimed alert on gpio%d", gpioNumber);
+    } else {
+        DLOG_ERROR("Failed to claim alert for gpio%d (err %d)", gpioNumber, status);
+    }
 
     // Set up the alert function for the GPIO pin
     status = ::lgGpioSetAlertsFunc(sHandle, gpioNumber, &DelegateCallback, nullptr);
     if (status == 0) {
         DLOG_DEBUG("Successfully registered a callback on gpio%d", gpioNumber);
     } else {
-        DLOG_ERROR("Failed to set alert function for GPIO %d (err %d)", gpioNumber, status);
+        DLOG_ERROR("Failed to set alert function for gpio%d (err %d)", gpioNumber, status);
     }
     return;
 }
 
 Watcher::~Watcher() {
     DLOG_DEBUG("");
+    
+    if (mThread.joinable()) {
+        mThread.join();
+    }
+
     if (sHandle > 0) {
         ::lgGpiochipClose(sHandle);
     }
-
+    
     if (sCallbackMap.contains(mGpioDeviceNumber)) {
         sCallbackMap.erase(mGpioDeviceNumber);
     }

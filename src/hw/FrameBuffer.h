@@ -22,6 +22,7 @@
 
 #include <cstddef>
 #include <string>
+#include <thread>
 
 namespace thermal {
 namespace hw {

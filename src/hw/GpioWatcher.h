@@ -31,6 +31,7 @@ extern "C" {
 
 #include <vector>
 #include <functional>
+#include <thread>
 
 namespace thermal {
 namespace gpio {
@@ -39,9 +40,10 @@ typedef std::function<void(int32_t, bool)> Callback;
 
 class Watcher {
 public:
-    Watcher(int32_t gpioNumber);
+    Watcher(int32_t gpioNumber, int32_t pullup = LG_SET_PULL_UP);
     ~Watcher();
 
+    //void AlertPinChange();
     void RegisterOnChangeCallback(Callback callback);
     void UnregisterOnChangeCallback(Callback callback);
     constexpr const int32_t Gpio() const;
@@ -50,6 +52,8 @@ public:
 private:
     inline static int32_t sHandle = -1;
     const int32_t mGpioDeviceNumber;
+
+    std::thread mThread;
 };
 
 } // namespace gpio

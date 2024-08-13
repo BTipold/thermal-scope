@@ -22,19 +22,20 @@
 
 #include <memory>
 
+#include "CommonDefs.h"
 #include "FrameBuffer.h"
-#include "VideoOverlay.h"
-#include "P2ProManager.h"
-#include "UsbControl.h"
-#include "Webcam.h"
 #include "PersistentValue.h"
+#include "P2ProManager.h"
 #include "Reticle.h"
+#include "UsbControl.h"
+#include "VideoOverlay.h"
+#include "Webcam.h"
 
 namespace thermal {
 
 class ThermalScopeApplication {
 public:
-    ThermalScopeApplication();
+    ThermalScopeApplication(int32_t argc, char* argv[]);
     ~ThermalScopeApplication();
 
     void Init();
@@ -56,7 +57,7 @@ private:
     persistent::Value<int32_t> mYOffsetSetting;
     persistent::Value<uint32_t> mZoomSetting;
 
-    bool OnCameraData(cv::Mat& frame);
+    bool OnCameraData(cv::Mat& frame, bool lastFrame);
     void OnRotateSide(hw::Direction direction);
     void OnRotateTop(hw::Direction direction);
     void OnClickSide(bool level);

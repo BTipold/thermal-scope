@@ -37,6 +37,8 @@ FrameBuffer::FrameBuffer(std::string device)
 	: mFileDescriptor(-1)
     , mDeviceName(device)
 	, mBufferSize(0ull)
+    , mFInfo{}
+    , mVInfo{}
 	, mFrameBufferPtr(nullptr) {
 
     // Open the file for reading and writing
@@ -62,7 +64,7 @@ FrameBuffer::FrameBuffer(std::string device)
     mBufferSize = mFInfo.smem_len;
     mFrameBufferPtr = (char*)::mmap(0, mBufferSize, PROT_READ | PROT_WRITE, MAP_SHARED, mFileDescriptor, 0);
 
-    if ((int)mFrameBufferPtr == -1) {
+    if (reinterpret_cast<int32_t>(mFrameBufferPtr) == -1) {
         DLOG_ERROR("Failed to mmap");
     } else {
         DLOG_DEBUG("Initialize mmap at %p", mFrameBufferPtr);
@@ -80,7 +82,7 @@ bool FrameBuffer::Write(uint8_t* image, size_t size) {
     bool status = false;
 
     if (image != nullptr) {
-        DLOG_DEBUG("writing image [%p] to /dev/fb0 [%p] with size %u\n", image, mFrameBufferPtr, size);
+        //DLOG_DEBUG("writing image [%p] to /dev/fb0 [%p] with size %u\n", image, mFrameBufferPtr, size);
         if (size > mBufferSize) {
             DLOG_WARN("likely overflow, size %u > screen size: %u", size, mBufferSize);
             return false;

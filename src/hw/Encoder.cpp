@@ -27,14 +27,14 @@ using std::placeholders::_2;
 
 Encoder::Encoder(int32_t pinA, int32_t pinB, int32_t btnPin)
     : mRotateCallback(nullptr)
-    , mClickCallback(nullptr) 
+    , mClickCallback(nullptr)
     , mGpioA(pinA)
     , mGpioB(pinB)
     , mGpioBtn(btnPin) {
     mGpioA.RegisterOnChangeCallback(bind(&Encoder::OnRotateEvent, this, _1, _2));
     mGpioB.RegisterOnChangeCallback(bind(&Encoder::OnRotateEvent, this, _1, _2));
     mGpioBtn.RegisterOnChangeCallback(bind(&Encoder::OnClickEvent, this, _1, _2));
-    return; 
+    return;
 }
 
 Encoder::~Encoder() {
@@ -51,39 +51,50 @@ void Encoder::SetOnClickCallback(ClickCallback callback) {
     return;
 }
 
-/// @brief called by the gpio::watcher automatically when the gpio level flips.
-/// @param gpio - gpio number
-/// @param level - high/low
-void Encoder::OnRotateEvent(int32_t gpio, [[maybe_unused]] bool level) {
-    
+void Encoder::ClearOnRotateCallback() {
+    mRotateCallback = nullptr;
+    return;
+}
+
+void Encoder::ClearOnClickCallback() {
+    mClickCallback = nullptr;
+    return;
+}
+
+// from https://www.allaboutcircuits.com/projects/how-to-use-a-rotary-encoder-in-a-mcu-based-project/
+void Encoder::OnRotateEvent([[maybe_unused]] int32_t, [[maybe_unused]] bool) {
+
+    // Read A and B signals
     bool currentA = mGpioA.Read();
     bool currentB = mGpioB.Read();
+    
+    // Record the A and B signals in seperate sequences
+    mSeqA <<= 1;
+    mSeqA |= currentA;
+    
+    mSeqB <<= 1;
+    mSeqB |= currentB;
+    
+    // Mask the MSB four bits
+    mSeqA &= 0b00001111;
+    mSeqB &= 0b00001111;
 
-    if (currentA != mPrevA || currentB != mPrevB) {
-        
-        // Encoder rotation detected
-        if (mRotateCallback) {
-            if (currentA == currentB) {
-                DLOG_DEBUG("Encoder increment");
-                mRotateCallback(Direction::kIncrement); // Clockwise
-            } else {
-                DLOG_DEBUG("Encoder decrement");
-                mRotateCallback(Direction::kDecrement); // Counterclockwise
-            }
-        }
-
-        // Update previous state
-        mPrevA = currentA;
-        mPrevB = currentB;
+    // Compare the recorded sequence with the expected sequence
+    if ((mSeqA == 0b00001001) && (mSeqB == 0b00000011)) {
+        DLOG_DEBUG("INCREMENT");
+        mRotateCallback(Direction::kIncrement);
+    }
+    
+    if ((mSeqA == 0b00000011) && (mSeqB == 0b00001001)) {
+        DLOG_DEBUG("DECREMENT");
+        mRotateCallback(Direction::kDecrement);
     }
 }
 
-
 /// @brief called by the gpio::watcher automatically when the gpio level flips.
 /// @param gpio - gpio number
 /// @param level - high/low
-void Encoder::OnClickEvent(int32_t gpio, bool level) {
-    DLOG_DEBUG("Btn Clicked (gpio %d)", gpio);
+void Encoder::OnClickEvent([[maybe_unused]] int32_t, bool level) {
     mClickCallback(level);
 }
 

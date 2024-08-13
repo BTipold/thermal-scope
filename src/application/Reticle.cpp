@@ -33,13 +33,24 @@ Reticle::Reticle(const std::string& path)
     , mXOffset(0)
     , mYOffset(0) {
     DLOG_DEBUG("loading reticle img: %s", path.c_str());
+    SetImagePath(path);
+}
 
+Reticle::~Reticle() {
+    DLOG_DEBUG("");
+}
+
+cv::Mat& Reticle::GetOverlay() {
+    return mReticle;
+}
+
+void Reticle::SetImagePath(const std::string& path) {
     // Load the reticle image
     mSource = cv::imread(path, cv::IMREAD_UNCHANGED);
-
+    
     // Check if the file exists and can be opened
     if (mSource.empty()) {
-        DLOG_ERROR("Failed to load reticle image from path: %s", path.c_str());
+        DLOG_WARN("Failed to load reticle image from path: %s", path.c_str());
     }
 
     // Ensure the reticle image is of size 240x240
@@ -51,26 +62,34 @@ Reticle::Reticle(const std::string& path)
     if (mSource.channels() == 3) {
         cv::cvtColor(mReticle, mReticle, cv::COLOR_BGR2RGBA);
     }
-    return;
+
+    // Initialize mReticle with the processed mSource
+    mReticle = mSource.clone();
+
+    SetOffset(mXOffset, mYOffset);
 }
 
-Reticle::~Reticle() {
-    DLOG_DEBUG("");
-}
 
-void Reticle::Overlay(cv::Mat& frame) const {
-    
-}
-
-void Reticle::SetOffset(size_t x, size_t y) {
-    DLOG_DEBUG("changed reticle offset %ux%u", x, y);
+void Reticle::SetOffset(int32_t x, int32_t y) {
+    DLOG_DEBUG("changed reticle offset (%d,%d)", x, y);
     mXOffset = x;
-    mYOffset = y;
+    mYOffset = -y; // the y is inverted for some reason
+
+    // Ensure mReticle is a clone of mSource before applying the offset
+    mReticle = mSource.clone();
 
     // use warp affine as per this post: 
     // https://stackoverflow.com/questions/19068085/shift-image-content-with-opencv/26766505#26766505
     cv::Mat transform = (cv::Mat_<double>(2,3) << 1, 0, x, 0, 1, y);
     cv::warpAffine(mSource, mReticle, transform, mSource.size());
+}
+
+void Reticle::SetX(int32_t x) {
+    SetOffset(x, mYOffset);
+}
+
+void Reticle::SetY(int32_t y) {
+    SetOffset(mXOffset, y);
 }
 
 } // namespace thermal

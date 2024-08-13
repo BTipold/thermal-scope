@@ -28,7 +28,7 @@
 namespace thermal {
 namespace p2pro {
 
-typedef std::function<bool(cv::Mat& frame)> VideoCallback;
+typedef std::function<bool(cv::Mat&, bool)> VideoCallback;
 
 enum class WebcamState : uint8_t {
     kNotConnected,

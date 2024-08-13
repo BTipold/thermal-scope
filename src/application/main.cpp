@@ -19,12 +19,12 @@
 #include "Logger.h"
 #include "ThermalScopeApplication.h"
 
-int main(int argc, char* argv[]) {
+int main(int32_t argc, char* argv[]) {
     try {
         thermal::log::LogInit();
         DLOG_NOTICE("Starting thermal scope application");
         
-        thermal::ThermalScopeApplication app;
+        thermal::ThermalScopeApplication app(argc, argv);
         app.Init();
         app.Run();
         return 0;
